@@ -1,0 +1,8 @@
+# Prisma - tabela de particoes (Cardputer ADV, flash de 8 MB)
+#  nvs     = ajustes, funcoes e variaveis do Prisma (namespace "prisma")
+#  factory = o Prisma (3 MB; o binario tem bem menos que isso)
+#
+# Name,   Type, SubType, Offset,   Size
+nvs,      data, nvs,     0x9000,   0x6000
+phy_init, data, phy,     0xF000,   0x1000
+factory,  app,  factory, 0x10000,  0x300000

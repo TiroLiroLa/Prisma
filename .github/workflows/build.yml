@@ -1,0 +1,83 @@
+# Compila o Prisma na nuvem do GitHub a cada push.
+# - Arquivos prontos: Actions -> (execucao) -> Artifacts -> "prisma".
+# - Na branch main tambem vao para Releases -> "latest" (link fixo:
+#   https://github.com/<usuario>/Prisma/releases/latest/download/prisma-full.bin)
+#   e para a branch "binarios".
+name: build
+
+on:
+  push:
+    branches-ignore: [binarios]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Testes do motor (nativo)
+        run: |
+          g++ -std=c++11 -O2 -Isrc tests/test_expr.cpp src/core/expr.cpp src/core/numeric.cpp -o test_expr
+          ./test_expr
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ hashFiles('platformio.ini') }}
+
+      - name: Firmware (PlatformIO)
+        run: |
+          pip install platformio "esptool<5"
+          set -o pipefail
+          pio run -e cardputer-adv 2>&1 | tee build.log
+
+      - name: Mostrar erros de compilacao
+        if: failure()
+        run: |
+          [ -f build.log ] || exit 0
+          grep -E "error:|undefined reference|fatal error|region .* overflowed|No such file" build.log \
+            | sed 's#^/home/runner/work/[^/]*/[^/]*/##' | sort -u | head -40 \
+            | while IFS= read -r l; do echo "::error::$l"; done
+
+      - name: Empacotar
+        run: |
+          ESPTOOL=esptool.py bash tools/merge.sh
+          grep -E "^(RAM|Flash):" build.log || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prisma
+          path: out/
+
+      - name: Publicar em Releases (latest)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VER=$(grep -oP 'PRISMA_VERSION "\K[^"]+' src/core/app.h)
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest out/prisma-full.bin out/prisma.bin \
+            --target "$GITHUB_SHA" --latest \
+            --title "Prisma $VER (build $GITHUB_RUN_NUMBER)" \
+            --notes-file .github/release-notes.md
+
+      - name: Publicar na branch binarios
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd out
+          git init -q -b binarios
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add prisma-full.bin prisma.bin
+          git commit -qm "Prisma build $GITHUB_RUN_NUMBER ($GITHUB_SHA)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" binarios

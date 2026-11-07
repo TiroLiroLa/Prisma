@@ -1,0 +1,5 @@
+.pio/
+build/
+out/
+sim/out/
+*.ppm
