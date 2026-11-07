@@ -19,7 +19,9 @@ struct Context {
   void* user;
   uint8_t depth;
   uint32_t rng;
-  Context() : degrees(false), userFn(nullptr), user(nullptr), depth(0), rng(0x9E3779B9u) {
+  // sem lista de inicialização para "degrees": o Arduino.h define degrees(x) como macro
+  Context() : userFn(nullptr), user(nullptr), depth(0), rng(0x9E3779B9u) {
+    degrees = false;
     for (int i = 0; i < NVARS; i++) vars[i] = 0;
   }
 };
