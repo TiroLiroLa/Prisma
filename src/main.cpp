@@ -10,7 +10,10 @@
 
 using namespace px;
 
-static M5Canvas canvas(&M5Cardputer.Display);
+// Sem tela "pai" no construtor: M5Cardputer.Display é uma referência dentro de outro
+// objeto global e ainda não existe quando este é construído (ordem de inicialização
+// entre arquivos). A tela é passada no pushSprite, já com tudo iniciado.
+static M5Canvas canvas;
 
 class CanvasGfx : public Gfx {
  public:
@@ -181,7 +184,7 @@ void loop() {
   if (app.frameDue(now) && now - lastFrame >= 15) {
     lastFrame = now;
     app.render(gfx);
-    canvas.pushSprite(0, 0);
+    canvas.pushSprite(&M5Cardputer.Display, 0, 0);
   }
   delay(1);
 }
